@@ -14,13 +14,6 @@ const geistMono = Geist_Mono({
 export const metadata = {
   title: "Sistem Kunci Proses",
   description: "Database Inventaris Alat Maintenance",
-  icons: {
-    icon: [
-      { url: '/logo.png', type: 'image/png' },
-    ],
-    shortcut: ['/logo.png'],
-    apple: ['/logo.png'], // Buat nampilin logo kalau di-save ke layar depan iPhone
-  },
 };
 export default function RootLayout({ children }) {
   return (
