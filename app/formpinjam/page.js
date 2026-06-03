@@ -10,8 +10,10 @@ export default function PinjamKunci() {
   const [areaKerja, setAreaKerja] = useState('');
   const [jumlahPinjam, setJumlahPinjam] = useState(1);
   const [loading, setLoading] = useState(false);
+  
+  // State baru khusus buat nangkep ketikan pencarian
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // Ambil cuma kunci yang stoknya > 0
   const fetchKunci = async () => {
     const { data, error } = await supabase
       .from('master_kunci')
@@ -26,13 +28,20 @@ export default function PinjamKunci() {
     fetchKunci();
   }, []);
 
+  // Logika Filter: Cuma nampilin kunci yang namanya atau ukurannya cocok sama ketikan
+  const filteredKunci = kunciTersedia.filter((k) => {
+    const nama = k.nama_alat ? k.nama_alat.toLowerCase() : '';
+    const size = k.ukuran ? k.ukuran.toLowerCase() : '';
+    const query = searchQuery.toLowerCase();
+    return nama.includes(query) || size.includes(query);
+  });
+
   const handlePinjam = async (e) => {
     e.preventDefault();
     if (!kunciId || !namaOperator || !nik || !areaKerja || !jumlahPinjam) {
       return alert('Semua kolom wajib diisi, bro!');
     }
 
-    // Cek apakah jumlah pinjam gak melebihi stok yang ada
     const alatYgDipilih = kunciTersedia.find(k => k.id === kunciId);
     if (jumlahPinjam > alatYgDipilih.stok_tersedia) {
       return alert(`Stok nggak cukup! Sisa ${alatYgDipilih.stok_tersedia} buah.`);
@@ -40,7 +49,6 @@ export default function PinjamKunci() {
 
     setLoading(true);
 
-    // 1. Catat ke tabel log_peminjaman
     const { error: errorLog } = await supabase.from('log_peminjaman').insert([
       {
         kunci_id: kunciId,
@@ -57,7 +65,6 @@ export default function PinjamKunci() {
       return alert('Gagal memproses peminjaman: ' + errorLog.message);
     }
 
-    // 2. Kurangi stok_tersedia di tabel master_kunci
     const sisaStokBaru = alatYgDipilih.stok_tersedia - parseInt(jumlahPinjam);
     const { error: errorUpdate } = await supabase
       .from('master_kunci')
@@ -75,7 +82,8 @@ export default function PinjamKunci() {
       setNik('');
       setAreaKerja('');
       setJumlahPinjam(1);
-      fetchKunci(); // Refresh list dropdown
+      setSearchQuery(''); // Reset pencarian juga
+      fetchKunci();
     }
   };
 
@@ -89,7 +97,6 @@ export default function PinjamKunci() {
       <div className="min-h-screen bg-slate-950 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(30,58,138,0.4),rgba(2,6,23,1))] text-slate-200 p-4 font-jakarta flex items-center justify-center selection:bg-blue-500/30">
         
         <div className="w-full max-w-md bg-slate-900/60 p-6 rounded-3xl border border-slate-800/80 shadow-2xl backdrop-blur-xl relative overflow-hidden">
-          {/* Aksen Garis Atas */}
           <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-cyan-400 to-blue-500"></div>
           
           <div className="text-center mb-8 mt-2">
@@ -102,20 +109,36 @@ export default function PinjamKunci() {
           </div>
 
           <form onSubmit={handlePinjam} className="space-y-5">
-            <div>
-              <label className="block text-sm font-semibold text-slate-300 mb-2">Pilih Kunci / Alat</label>
+            
+            {/* --- BAGIAN PENCARIAN & DROPDOWN BARU --- */}
+            <div className="bg-slate-950/40 p-4 rounded-xl border border-slate-700/50">
+              <label className="block text-sm font-semibold text-cyan-400 mb-2">Cari & Pilih Alat</label>
+              
+              {/* Kolom Search */}
+              <input 
+                type="text" 
+                placeholder="🔍 Ketik nama / ukuran alat..." 
+                value={searchQuery} 
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full p-3 mb-3 bg-slate-900 rounded-lg border border-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 text-sm text-white placeholder-slate-500 transition-all"
+              />
+
+              {/* Dropdown Hasil Search */}
               <select 
                 value={kunciId} onChange={(e) => setKunciId(e.target.value)}
-                className="w-full p-3.5 bg-slate-950/80 rounded-xl border border-slate-700/50 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 text-base text-white font-medium appearance-none"
+                className="w-full p-3 bg-slate-900 rounded-lg border border-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 text-sm text-white font-medium appearance-none"
               >
-                <option value="" disabled>-- Pilih alat yang tersedia --</option>
-                {kunciTersedia.map((k) => (
+                <option value="" disabled>
+                  {filteredKunci.length === 0 ? '❌ Alat tidak ditemukan' : `-- Pilih dari ${filteredKunci.length} alat tersedia --`}
+                </option>
+                {filteredKunci.map((k) => (
                   <option key={k.id} value={k.id}>
-                    {k.nama_alat} {k.ukuran ? `(${k.ukuran})` : ''} - Sisa {k.stok_tersedia}
+                    {k.nama_alat} {k.ukuran ? `(${k.ukuran})` : ''} - Sisa: {k.stok_tersedia}
                   </option>
                 ))}
               </select>
             </div>
+            {/* ---------------------------------------- */}
 
             <div className="grid grid-cols-3 gap-3">
               <div className="col-span-2">
@@ -145,10 +168,10 @@ export default function PinjamKunci() {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-300 mb-2">Departemen </label>
+              <label className="block text-sm font-semibold text-slate-300 mb-2">Area Kerja (Tujuan)</label>
               <input 
                 type="text" value={areaKerja} onChange={(e) => setAreaKerja(e.target.value)}
-                placeholder="Contoh: Mekanik, Elektrik , PWP..." 
+                placeholder="Contoh: Stasiun Centrifuge, Filtrasi..." 
                 className="w-full p-3.5 bg-slate-950/80 rounded-xl border border-slate-700/50 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 text-base text-white"
               />
             </div>
