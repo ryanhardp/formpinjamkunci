@@ -168,10 +168,10 @@ export default function PinjamKunci() {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-300 mb-2">Area Kerja (Tujuan)</label>
+              <label className="block text-sm font-semibold text-slate-300 mb-2">Departemen</label>
               <input 
                 type="text" value={areaKerja} onChange={(e) => setAreaKerja(e.target.value)}
-                placeholder="Contoh: Stasiun Centrifuge, Filtrasi..." 
+                placeholder="Contoh: Proses, Mekanik, Elektrik..." 
                 className="w-full p-3.5 bg-slate-950/80 rounded-xl border border-slate-700/50 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 text-base text-white"
               />
             </div>
