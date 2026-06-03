@@ -133,7 +133,7 @@ export default function Home() {
               </h1>
               <p className="text-slate-300 text-sm md:text-lg font-medium flex items-center justify-center md:justify-start gap-3">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_10px_rgba(52,211,153,0.8)]"></span>
-                Terminal Monitoring Utama (Khusus Pengawas / Toolman Gudang)
+                Terminal Monitoring Utama 
               </p>
             </div>
           </div>
