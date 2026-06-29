@@ -161,7 +161,7 @@ export default function PinjamKunci() {
 
             <div className="grid grid-cols-3 gap-3 pt-2">
               <div className="col-span-2">
-                <label className="block text-sm font-semibold text-slate-300 mb-2">Nama Operator</label>
+                <label className="block text-sm font-semibold text-slate-300 mb-2">Nama</label>
                 <input 
                   type="text" value={namaOperator} onChange={(e) => setNamaOperator(e.target.value)}
                   placeholder="Nama Lengkap" 
