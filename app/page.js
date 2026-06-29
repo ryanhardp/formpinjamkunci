@@ -5,10 +5,17 @@ import { supabase } from '@/lib/supabase';
 export default function Home() {
   const [kunciList, setKunciList] = useState([]);
   const [logList, setLogList] = useState([]);
+  
+  // State Form
   const [namaAlat, setNamaAlat] = useState('');
   const [ukuran, setUkuran] = useState('');
   const [stokTotal, setStokTotal] = useState('');
   const [lokasiRak, setLokasiRak] = useState('');
+  
+  // State Tambahan Khusus Fitur Edit
+  const [editId, setEditId] = useState(null);
+  const [oldStokTotal, setOldStokTotal] = useState(0); // Buat ngitung selisih kalau stok diedit
+
   const [loading, setLoading] = useState(false);
 
   // 1. Ambil Data Master Kunci
@@ -47,32 +54,77 @@ export default function Home() {
     fetchActiveLogs();
   }, []);
 
-  // 3. Fungsi Tambah Kunci Baru
-  const handleTambahKunci = async (e) => {
+  // Fungsi Reset Form biar gampang dipanggil
+  const resetForm = () => {
+    setEditId(null);
+    setNamaAlat('');
+    setUkuran('');
+    setStokTotal('');
+    setOldStokTotal(0);
+    setLokasiRak('');
+  };
+
+  // 3. Fungsi Simpan (Bisa buat TAMBAH BARU atau EDIT UPDATE)
+  const handleSimpanKunci = async (e) => {
     e.preventDefault();
     if (!namaAlat || !stokTotal) return alert('Nama Alat dan Jumlah Total wajib diisi!');
     
     setLoading(true);
-    const { error } = await supabase.from('master_kunci').insert([
-      {
-        nama_alat: namaAlat,
-        ukuran: ukuran,
-        stok_total: parseInt(stokTotal),
-        stok_tersedia: parseInt(stokTotal), 
-        lokasi_rak: lokasiRak,
-      },
-    ]);
 
-    setLoading(false);
-    if (error) {
-      alert('Gagal menambah data: ' + error.message);
+    if (editId) {
+      // LOGIKA JIKA MODE EDIT
+      const alat = kunciList.find(k => k.id === editId);
+      
+      // Hitung selisih stok (misal: stok lama 5, diubah jadi 7. Berarti nambah 2)
+      const selisihStok = parseInt(stokTotal) - oldStokTotal;
+      const stokTersediaBaru = alat.stok_tersedia + selisihStok;
+
+      // Cegah kalau edit stok malah bikin minus (kurang dari yang lagi dipinjam)
+      if (stokTersediaBaru < 0) {
+        setLoading(false);
+        return alert('Gagal! Total stok yang baru lebih kecil dari jumlah alat yang sedang dipinjam saat ini.');
+      }
+
+      const { error } = await supabase
+        .from('master_kunci')
+        .update({
+          nama_alat: namaAlat,
+          ukuran: ukuran,
+          stok_total: parseInt(stokTotal),
+          stok_tersedia: stokTersediaBaru,
+          lokasi_rak: lokasiRak
+        })
+        .eq('id', editId);
+
+      setLoading(false);
+      if (error) {
+        alert('Gagal update data: ' + error.message);
+      } else {
+        alert('Mantap! Data kunci berhasil diupdate bray.');
+        resetForm();
+        fetchKunci();
+      }
+
     } else {
-      alert('Kunci baru berhasil ditambahkan bray!');
-      setNamaAlat('');
-      setUkuran('');
-      setStokTotal('');
-      setLokasiRak('');
-      fetchKunci();
+      // LOGIKA JIKA MODE TAMBAH BARU (Original)
+      const { error } = await supabase.from('master_kunci').insert([
+        {
+          nama_alat: namaAlat,
+          ukuran: ukuran,
+          stok_total: parseInt(stokTotal),
+          stok_tersedia: parseInt(stokTotal), 
+          lokasi_rak: lokasiRak,
+        },
+      ]);
+
+      setLoading(false);
+      if (error) {
+        alert('Gagal menambah data: ' + error.message);
+      } else {
+        alert('Kunci baru berhasil ditambahkan bray!');
+        resetForm();
+        fetchKunci();
+      }
     }
   };
 
@@ -81,14 +133,11 @@ export default function Home() {
     const konfirmasi = confirm("Apakah fisik alat sudah dikembalikan dengan benar dan kondisinya aman?");
     if (!konfirmasi) return;
 
-    // Cari tahu stok tersedia saat ini dari state lokal
     const alat = kunciList.find(k => k.id === kunciId);
     if (!alat) return alert("Data alat tidak ditemukan!");
 
-    // Hitung stok baru (Stok lama + jumlah yang dikembalikan)
     const stokTersediaBaru = alat.stok_tersedia + jumlahPinjam;
 
-    // A. Update status di tabel log_peminjaman
     const { error: errorLog } = await supabase
       .from('log_peminjaman')
       .update({ status: 'Dikembalikan', waktu_kembali: new Date().toISOString() })
@@ -96,7 +145,6 @@ export default function Home() {
 
     if (errorLog) return alert("Gagal update status log: " + errorLog.message);
 
-    // B. Kembalikan angka stok_tersedia di tabel master_kunci
     const { error: errorKunci } = await supabase
       .from('master_kunci')
       .update({ stok_tersedia: stokTersediaBaru })
@@ -106,10 +154,21 @@ export default function Home() {
       alert("Status transaksi berhasil diubah, tapi stok master gagal bertambah otomatis!");
     } else {
       alert("Alat berhasil diterima! Stok gudang telah diperbarui.");
-      // Refresh semua tabel harian
       fetchKunci();
       fetchActiveLogs();
     }
+  };
+
+  // Fungsi saat tombol Edit di tabel diklik
+  const handlePencetEdit = (kunci) => {
+    setEditId(kunci.id);
+    setNamaAlat(kunci.nama_alat);
+    setUkuran(kunci.ukuran || '');
+    setStokTotal(kunci.stok_total);
+    setOldStokTotal(kunci.stok_total);
+    setLokasiRak(kunci.lokasi_rak || '');
+    // Scroll mulus ke atas biar formnya kelihatan
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
@@ -133,22 +192,31 @@ export default function Home() {
               </h1>
               <p className="text-slate-300 text-sm md:text-lg font-medium flex items-center justify-center md:justify-start gap-3">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_10px_rgba(52,211,153,0.8)]"></span>
-                Terminal Monitoring Utama 
+                Terminal Monitoring Utama (Khusus Pengawas / Toolman Gudang)
               </p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             
-            {/* FORM INPUT KUNCI BARU */}
-            <div className="bg-slate-900/40 p-6 md:p-8 rounded-2xl border border-slate-800/60 shadow-xl backdrop-blur-sm h-fit relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-cyan-400"></div>
-              <h2 className="text-xl font-bold mb-6 text-white flex items-center gap-2">
-                <svg className="w-6 h-6 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
-                Tambah Alat Baru
+            {/* FORM INPUT / EDIT KUNCI BARU */}
+            <div className={`bg-slate-900/40 p-6 md:p-8 rounded-2xl border ${editId ? 'border-amber-500/60 shadow-[0_0_20px_rgba(245,158,11,0.15)]' : 'border-slate-800/60 shadow-xl'} backdrop-blur-sm h-fit relative overflow-hidden transition-all duration-300`}>
+              <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r ${editId ? 'from-amber-500 to-orange-400' : 'from-blue-500 to-cyan-400'}`}></div>
+              <h2 className={`text-xl font-bold mb-6 flex items-center gap-2 ${editId ? 'text-amber-400' : 'text-white'}`}>
+                {editId ? (
+                  <>
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                    Edit Data Alat
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-6 h-6 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
+                    Tambah Alat Baru
+                  </>
+                )}
               </h2>
               
-              <form onSubmit={handleTambahKunci} className="space-y-5">
+              <form onSubmit={handleSimpanKunci} className="space-y-5">
                 <div>
                   <label className="block text-sm font-semibold text-slate-300 mb-1.5">Nama Alat / Kunci</label>
                   <input 
@@ -183,12 +251,28 @@ export default function Home() {
                     />
                   </div>
                 </div>
-                <button 
-                  type="submit" disabled={loading}
-                  className="w-full mt-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 p-3.5 rounded-xl text-white font-bold shadow-[0_0_15px_rgba(6,182,212,0.4)] transform hover:-translate-y-0.5 transition-all duration-200"
-                >
-                  {loading ? 'Menyimpan...' : 'Simpan ke Database'}
-                </button>
+                
+                <div className="pt-2">
+                  <button 
+                    type="submit" disabled={loading}
+                    className={`w-full p-3.5 rounded-xl text-white font-bold transform hover:-translate-y-0.5 transition-all duration-200 ${
+                      editId 
+                      ? 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 shadow-[0_0_15px_rgba(245,158,11,0.3)]' 
+                      : 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 shadow-[0_0_15px_rgba(6,182,212,0.4)]'
+                    }`}
+                  >
+                    {loading ? 'Memproses...' : (editId ? 'Update Database' : 'Simpan ke Database')}
+                  </button>
+
+                  {editId && (
+                    <button 
+                      type="button" onClick={resetForm}
+                      className="w-full mt-3 bg-slate-800/80 hover:bg-slate-700 p-3.5 rounded-xl text-slate-300 font-bold transition-all duration-200 border border-slate-600/50"
+                    >
+                      Batal Edit
+                    </button>
+                  )}
+                </div>
               </form>
             </div>
 
@@ -211,6 +295,7 @@ export default function Home() {
                       <th className="p-4 text-center">Total Stok</th>
                       <th className="p-4 text-center">Tersedia</th>
                       <th className="p-4">Lokasi</th>
+                      <th className="p-4 text-center">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700/50 bg-slate-900/30">
@@ -231,6 +316,14 @@ export default function Home() {
                           )}
                         </td>
                         <td className="p-4 text-slate-400 font-medium">{kunci.lokasi_rak || '-'}</td>
+                        <td className="p-4 text-center">
+                          <button
+                            onClick={() => handlePencetEdit(kunci)}
+                            className="text-xs bg-slate-800 hover:bg-amber-600/20 text-slate-300 hover:text-amber-400 px-3 py-1.5 rounded-lg border border-slate-600/50 hover:border-amber-500/50 transition-all font-semibold"
+                          >
+                            Edit
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
