@@ -11,8 +11,9 @@ export default function PinjamKunci() {
   const [jumlahPinjam, setJumlahPinjam] = useState(1);
   const [loading, setLoading] = useState(false);
   
-  // State baru khusus buat nangkep ketikan pencarian
+  // State khusus buat search & nampilin pop-up dropdown
   const [searchQuery, setSearchQuery] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
 
   const fetchKunci = async () => {
     const { data, error } = await supabase
@@ -28,7 +29,7 @@ export default function PinjamKunci() {
     fetchKunci();
   }, []);
 
-  // Logika Filter: Cuma nampilin kunci yang namanya atau ukurannya cocok sama ketikan
+  // Logika Filter
   const filteredKunci = kunciTersedia.filter((k) => {
     const nama = k.nama_alat ? k.nama_alat.toLowerCase() : '';
     const size = k.ukuran ? k.ukuran.toLowerCase() : '';
@@ -39,7 +40,7 @@ export default function PinjamKunci() {
   const handlePinjam = async (e) => {
     e.preventDefault();
     if (!kunciId || !namaOperator || !nik || !areaKerja || !jumlahPinjam) {
-      return alert('Semua kolom wajib diisi, bro!');
+      return alert('Pilih alatnya dari daftar yang muncul dan isi semua kolom ya!');
     }
 
     const alatYgDipilih = kunciTersedia.find(k => k.id === kunciId);
@@ -82,7 +83,8 @@ export default function PinjamKunci() {
       setNik('');
       setAreaKerja('');
       setJumlahPinjam(1);
-      setSearchQuery(''); // Reset pencarian juga
+      setSearchQuery(''); 
+      setShowDropdown(false);
       fetchKunci();
     }
   };
@@ -108,39 +110,56 @@ export default function PinjamKunci() {
             </p>
           </div>
 
-          <form onSubmit={handlePinjam} className="space-y-5">
+          <form onSubmit={handlePinjam} className="space-y-5 relative">
             
-            {/* --- BAGIAN PENCARIAN & DROPDOWN BARU --- */}
-            <div className="bg-slate-950/40 p-4 rounded-xl border border-slate-700/50">
+            {/* --- SMART AUTOCOMPLETE DROPDOWN --- */}
+            <div className="bg-slate-950/40 p-4 rounded-xl border border-slate-700/50 relative">
               <label className="block text-sm font-semibold text-cyan-400 mb-2">Cari & Pilih Alat</label>
               
-              {/* Kolom Search */}
               <input 
                 type="text" 
-                placeholder="🔍 Ketik nama / ukuran alat..." 
+                placeholder="🔍 Ketik nama alat (misal: Pas 24)..." 
                 value={searchQuery} 
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full p-3 mb-3 bg-slate-900 rounded-lg border border-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 text-sm text-white placeholder-slate-500 transition-all"
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setKunciId(''); // Batalin pilihan kalau operator ngetik ulang
+                  setShowDropdown(true); // Munculin list pas ngetik
+                }}
+                onFocus={() => setShowDropdown(true)}
+                className="w-full p-3 bg-slate-900 rounded-lg border border-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 text-sm text-white placeholder-slate-500 transition-all"
               />
 
-              {/* Dropdown Hasil Search */}
-              <select 
-                value={kunciId} onChange={(e) => setKunciId(e.target.value)}
-                className="w-full p-3 bg-slate-900 rounded-lg border border-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 text-sm text-white font-medium appearance-none"
-              >
-                <option value="" disabled>
-                  {filteredKunci.length === 0 ? '❌ Alat tidak ditemukan' : `-- Pilih dari ${filteredKunci.length} alat tersedia --`}
-                </option>
-                {filteredKunci.map((k) => (
-                  <option key={k.id} value={k.id}>
-                    {k.nama_alat} {k.ukuran ? `(${k.ukuran})` : ''} - Sisa: {k.stok_tersedia}
-                  </option>
-                ))}
-              </select>
+              {/* Kotak Hasil Pencarian Melayang */}
+              {showDropdown && (
+                <div className="absolute z-50 left-0 right-0 mx-4 mt-2 bg-slate-800 border border-slate-600 rounded-lg shadow-2xl max-h-48 overflow-y-auto">
+                  {filteredKunci.length === 0 ? (
+                    <div className="p-4 text-sm text-slate-400 text-center font-medium">❌ Alat tidak ditemukan / Stok Habis</div>
+                  ) : (
+                    filteredKunci.map((k) => (
+                      <div 
+                        key={k.id} 
+                        onClick={() => {
+                          setKunciId(k.id); // Simpan ID ke database
+                          setSearchQuery(`${k.nama_alat} ${k.ukuran ? `(${k.ukuran})` : ''}`); // Tulis nama alat di kolom
+                          setShowDropdown(false); // Tutup list
+                        }}
+                        className="p-3 hover:bg-cyan-600 cursor-pointer text-sm text-white border-b border-slate-700/50 last:border-0 transition-colors flex justify-between items-center"
+                      >
+                        <span className="font-medium">
+                          {k.nama_alat} <span className="text-cyan-200">{k.ukuran ? `(${k.ukuran})` : ''}</span>
+                        </span>
+                        <span className="bg-slate-900/50 px-2.5 py-1 rounded-md text-xs font-bold text-emerald-400 border border-emerald-500/30">
+                          Sisa: {k.stok_tersedia}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
             {/* ---------------------------------------- */}
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-3 pt-2">
               <div className="col-span-2">
                 <label className="block text-sm font-semibold text-slate-300 mb-2">Nama Operator</label>
                 <input 
