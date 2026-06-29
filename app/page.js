@@ -100,7 +100,7 @@ export default function Home() {
       if (error) {
         alert('Gagal update data: ' + error.message);
       } else {
-        alert('Mantap! Data kunci berhasil diupdate bray.');
+        alert('Sukses Diupdate! :)');
         resetForm();
         fetchKunci();
       }
@@ -121,7 +121,7 @@ export default function Home() {
       if (error) {
         alert('Gagal menambah data: ' + error.message);
       } else {
-        alert('Kunci baru berhasil ditambahkan bray!');
+        alert('Kunci baru berhasil ditambahkan!');
         resetForm();
         fetchKunci();
       }
@@ -338,7 +338,7 @@ export default function Home() {
             <h2 className="text-xl font-bold mb-6 text-white flex items-center justify-between">
               <span className="flex items-center gap-2">
                 <svg className="w-6 h-6 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                Daftar Alat Sedang Dipinjam Lapangan (Butuh Verifikasi Pengembalian)
+                Daftar Alat Sedang Dipinjam (Butuh Verifikasi Pengembalian)
               </span>
               <span className="text-sm font-semibold text-rose-100 bg-rose-900/50 px-4 py-1.5 rounded-full border border-rose-700/50">Outstanding: {logList.length} Transaksi</span>
             </h2>
